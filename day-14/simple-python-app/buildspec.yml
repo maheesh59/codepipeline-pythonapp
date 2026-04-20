@@ -2,30 +2,42 @@ version: 0.2
 
 env:
   parameter-store:
-    DOCKER_REGISTRY_USERNAME: /myapp/docker-credentials/username
-    DOCKER_REGISTRY_PASSWORD: /myapp/docker-credentials/password
-    DOCKER_REGISTRY_URL: /myapp/docker-registry/url
+    DOCKER_REGISTRY_USERNAME: "/myapp/docker-credentials/username"
+    DOCKER_REGISTRY_PASSWORD: "/myapp/docker-credentials/password"
+    DOCKER_REGISTRY_URL: "/myapp/docker-registry/url"
+
 phases:
   install:
     runtime-versions:
       python: 3.11
   pre_build:
     commands:
+      - echo "Sanitizing variables and logging in..."
+      # This 'tr' command removes any hidden newline characters (\n) or carriage returns (\r)
+      - CLEAN_USER=$(echo $DOCKER_REGISTRY_USERNAME | tr -d '\r\n')
+      - CLEAN_URL=$(echo $DOCKER_REGISTRY_URL | tr -d '\r\n')
+      - echo "$DOCKER_REGISTRY_PASSWORD" | docker login -u "$CLEAN_USER" --password-stdin "$CLEAN_URL"
       - echo "Installing dependencies..."
       - pip install -r day-14/simple-python-app/requirements.txt
   build:
     commands:
       - echo "Running tests..."
       - cd day-14/simple-python-app/
+      # Re-assign cleaned variables for the build command
+      - CLEAN_USER=$(echo $DOCKER_REGISTRY_USERNAME | tr -d '\r\n')
+      - CLEAN_URL=$(echo $DOCKER_REGISTRY_URL | tr -d '\r\n')
       - echo "Building Docker image..."
-      - echo "$DOCKER_REGISTRY_PASSWORD" | docker login -u "$DOCKER_REGISTRY_USERNAME" --password-stdin "$DOCKER_REGISTRY_URL"
-      - docker build -t "$DOCKER_REGISTRY_URL/$DOCKER_REGISTRY_USERNAME/simple-python-flask-app:latest" .
-      - docker push "$DOCKER_REGISTRY_URL/$DOCKER_REGISTRY_USERNAME/simple-python-flask-app:latest"
+      - docker build -t "$CLEAN_URL/$CLEAN_USER/simple-python-flask-app:latest" .
   post_build:
     commands:
+      - echo "Pushing Docker image..."
+      - CLEAN_USER=$(echo $DOCKER_REGISTRY_USERNAME | tr -d '\r\n')
+      - CLEAN_URL=$(echo $DOCKER_REGISTRY_URL | tr -d '\r\n')
+      - docker push "$CLEAN_URL/$CLEAN_USER/simple-python-flask-app:latest"
       - echo "Build completed successfully!"
+
 artifacts:
   files:
     - '**/*'
-  base-directory: ../simple-python-app
-
+  # Fixed the base-directory to point correctly to your app folder
+  base-directory: 'day-14/simple-python-app'
