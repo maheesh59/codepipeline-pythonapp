@@ -2,36 +2,29 @@ version: 0.2
 
 env:
   parameter-store:
-    DOCKER_REGISTRY_USERNAME: "/myapp/docker-credentials/username"
-    DOCKER_REGISTRY_PASSWORD: "/myapp/docker-credentials/password"
-    DOCKER_REGISTRY_URL: "/myapp/docker-registry/url"
-
+    DOCKER_REGISTRY_USERNAME: /myapp/docker-credentials/username
+    DOCKER_REGISTRY_PASSWORD: /myapp/docker-credentials/password
+    DOCKER_REGISTRY_URL: /myapp/docker-registry/url
 phases:
   install:
     runtime-versions:
       python: 3.11
   pre_build:
     commands:
-      - echo "Cleaning variables..."
-      - USER=$(echo $DOCKER_REGISTRY_USERNAME | tr -d '\r\n')
-      - PASS=$(echo $DOCKER_REGISTRY_PASSWORD | tr -d '\r\n')
-      # This strips https:// and trailing slashes just in case they exist
-      - URL=$(echo $DOCKER_REGISTRY_URL | sed -e 's|^https://||' -e 's|/$||' | tr -d '\r\n')
-      - echo "Logging in to $URL..."
-      - echo "$PASS" | docker login -u "$USER" --password-stdin "$URL"
+      - echo "Installing dependencies..."
       - pip install -r day-14/simple-python-app/requirements.txt
   build:
     commands:
+      - echo "Running tests..."
       - cd day-14/simple-python-app/
-      - USER=$(echo $DOCKER_REGISTRY_USERNAME | tr -d '\r\n')
-      - URL=$(echo $DOCKER_REGISTRY_URL | sed -e 's|^https://||' -e 's|/$||' | tr -d '\r\n')
-      - IMAGE_TAG="$URL/$USER/simple-python-flask-app:latest"
-      - echo "Building image with tag $IMAGE_TAG"
-      - docker build -t "$IMAGE_TAG" .
+      - echo "Building Docker image..."
+      - echo "$DOCKER_REGISTRY_PASSWORD" | docker login -u "$DOCKER_REGISTRY_USERNAME" --password-stdin "$DOCKER_REGISTRY_URL"
+      - docker build -t "$DOCKER_REGISTRY_URL/$DOCKER_REGISTRY_USERNAME/simple-python-flask-app:latest" .
+      - docker push "$DOCKER_REGISTRY_URL/$DOCKER_REGISTRY_USERNAME/simple-python-flask-app:latest"
   post_build:
     commands:
-      - USER=$(echo $DOCKER_REGISTRY_USERNAME | tr -d '\r\n')
-      - URL=$(echo $DOCKER_REGISTRY_URL | sed -e 's|^https://||' -e 's|/$||' | tr -d '\r\n')
-      - IMAGE_TAG="$URL/$USER/simple-python-flask-app:latest"
-      - echo "Pushing $IMAGE_TAG"
-      - docker push "$IMAGE_TAG"
+      - echo "Build completed successfully!"
+artifacts:
+  files:
+    - '**/*'
+  base-directory: ../simple-python-app
